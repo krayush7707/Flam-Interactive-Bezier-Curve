@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Interactive Bézier Rope</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0e0e0e;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+
+function vec(x, y) {
+  return { x, y };
+}
+
+function add(a, b) {
+  return vec(a.x + b.x, a.y + b.y);
+}
+
+function sub(a, b) {
+  return vec(a.x - b.x, a.y - b.y);
+}
+
+function mul(v, s) {
+  return vec(v.x * s, v.y * s);
+}
+
+function len(v) {
+  return Math.sqrt(v.x * v.x + v.y * v.y);
+}
+
+function normalize(v) {
+  const l = len(v);
+  return l === 0 ? vec(0, 0) : vec(v.x / l, v.y / l);
+}
+
+
+const P0 = vec(100, canvas.height / 2);
+const P3 = vec(canvas.width - 100, canvas.height / 2);
+
+let P1 = vec(canvas.width / 3, canvas.height / 2);
+let P2 = vec(2 * canvas.width / 3, canvas.height / 2);
+
+let v1 = vec(0, 0);
+let v2 = vec(0, 0);
+
+let target = vec(canvas.width / 2, canvas.height / 2);
+
+
+window.addEventListener("mousemove", e => {
+  target.x = e.clientX;
+  target.y = e.clientY;
+});
+
+
+const stiffness = 0.015;
+const damping = 0.85;
+
+
+function bezier(t, p0, p1, p2, p3) {
+  const u = 1 - t;
+  const tt = t * t;
+  const uu = u * u;
+  const uuu = uu * u;
+  const ttt = tt * t;
+
+  let p = mul(p0, uuu);
+  p = add(p, mul(p1, 3 * uu * t));
+  p = add(p, mul(p2, 3 * u * tt));
+  p = add(p, mul(p3, ttt));
+  return p;
+}
+
+function bezierTangent(t, p0, p1, p2, p3) {
+  const u = 1 - t;
+  let term1 = mul(sub(p1, p0), 3 * u * u);
+  let term2 = mul(sub(p2, p1), 6 * u * t);
+  let term3 = mul(sub(p3, p2), 3 * t * t);
+  return add(add(term1, term2), term3);
+}
+
+
+function updateSpring(pos, vel, target) {
+  let force = sub(target, pos);
+  force = mul(force, stiffness);
+  vel = add(vel, force);
+  vel = mul(vel, damping);
+  pos = add(pos, vel);
+  return { pos, vel };
+}
+
+
+function drawControlPoint(p, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+ 
+  let s1 = updateSpring(P1, v1, target);
+  P1 = s1.pos; v1 = s1.vel;
+
+  let s2 = updateSpring(P2, v2, target);
+  P2 = s2.pos; v2 = s2.vel;
+
+
+  ctx.strokeStyle = "#00ffd5";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  for (let t = 0; t <= 1; t += 0.01) {
+    const p = bezier(t, P0, P1, P2, P3);
+    if (t === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+
+ 
+  ctx.strokeStyle = "#ffae00";
+  for (let t = 0; t <= 1; t += 0.1) {
+    const p = bezier(t, P0, P1, P2, P3);
+    const tan = normalize(bezierTangent(t, P0, P1, P2, P3));
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + tan.x * 30, p.y + tan.y * 30);
+    ctx.stroke();
+  }
+
+  // Draw control points
+  drawControlPoint(P0, "#ffffff");
+  drawControlPoint(P1, "#ff5555");
+  drawControlPoint(P2, "#ff5555");
+  drawControlPoint(P3, "#ffffff");
+
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+
+</body>
+</html>
